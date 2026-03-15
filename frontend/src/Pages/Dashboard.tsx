@@ -33,15 +33,15 @@ const Dashboard = () => {
         <h1 className="text-2xl font-bold mb-8 text-indigo-600">Syncly</h1>
 
         <nav className="flex flex-col gap-4 flex-1">
-          <button className="flex items-center gap-3 p-2 hover:bg-indigo-100 rounded">
+          <button onClick={() => navigate("/meeting-types")} className="flex items-center gap-3 p-2 hover:bg-indigo-100 rounded">
             <CalendarIcon className="h-5 w-5" />
             Event Types
           </button>
-          <button className="flex items-center gap-3 p-2 hover:bg-indigo-100 rounded">
+          <button onClick={() => navigate("/meeting-types")} className="flex items-center gap-3 p-2 hover:bg-indigo-100 rounded">
             <ClockIcon className="h-5 w-5" />
             Meetings
           </button>
-          <button className="flex items-center gap-3 p-2 hover:bg-indigo-100 rounded">
+          <button onClick={() => navigate("/availability")} className="flex items-center gap-3 p-2 hover:bg-indigo-100 rounded">
             <UserIcon className="h-5 w-5" />
             Availability
           </button>
@@ -79,7 +79,10 @@ const Dashboard = () => {
       <main className="flex-1 p-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Event Types</h2>
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+          <button
+            onClick={() => navigate("/meeting-types")}
+            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          >
             + New Event Type
           </button>
         </div>
@@ -92,8 +95,8 @@ const Dashboard = () => {
                 {event.duration}, {event.type}
               </p>
               <div className="flex gap-2">
-                <button className="flex-1 border border-gray-300 rounded px-3 py-1 hover:bg-gray-100">
-                  Copy Link
+                <button className="flex-1 border border-gray-300 rounded px-3 py-1 hover:bg-gray-100" onClick={() => navigate("/meeting-types")}>
+                  Open
                 </button>
                 <button className="flex-1 bg-indigo-600 text-white rounded px-3 py-1 hover:bg-indigo-700">
                   Share
