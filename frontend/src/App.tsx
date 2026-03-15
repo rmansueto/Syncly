@@ -13,9 +13,14 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/availability" element={<Availability />} />
-        <Route path="/meeting-types" element={<MeetingTypes />} />
+
+        {/* Dashboard layout with nested routes */}
+        <Route path="/dashboard" element={<Dashboard />}>
+          <Route index element={<MeetingTypes />} />
+          <Route path="meeting-types" element={<MeetingTypes />} />
+          <Route path="availability" element={<Availability />} />
+        </Route>
+
       </Routes>
     </BrowserRouter>
   );
