@@ -30,6 +30,10 @@ public class MeetingTypeService {
         return repo.save(mt);
     }
 
+    public MeetingType update(MeetingType mt) {
+        return repo.save(mt);
+    }
+
     public List<MeetingType> list(Optional<Long> organizerId) {
         return organizerId.map(repo::findByOrganizerId).orElseGet(repo::findAll);
     }
@@ -38,12 +42,7 @@ public class MeetingTypeService {
         return repo.findById(id);
     }
 
-    /**
-     * Simple availability generator:
-     * - For each calendar day in [from,to) create slots between availableStart/availableEnd
-     * - Slot length = durationMinutes
-     * - No booking conflict checking
-     */
+    // availability(...) unchanged
     public List<OffsetDateTime> availability(Long meetingTypeId, OffsetDateTime from, OffsetDateTime to) {
         MeetingType mt = repo.findById(meetingTypeId).orElseThrow(() -> new NoSuchElementException("MeetingType not found"));
         List<OffsetDateTime> slots = new ArrayList<>();

@@ -23,7 +23,7 @@ public class MeetingType {
     // daily available window (local time)
     private LocalTime availableStart;
     private LocalTime availableEnd;
-
+    private Boolean active;
     public MeetingType() {}
 
     // getters / setters
@@ -40,4 +40,6 @@ public class MeetingType {
     public void setAvailableStart(LocalTime availableStart) { this.availableStart = availableStart; }
     public LocalTime getAvailableEnd() { return availableEnd; }
     public void setAvailableEnd(LocalTime availableEnd) { this.availableEnd = availableEnd; }
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
 }

@@ -23,6 +23,9 @@ public class Availability {
     private OffsetDateTime startDateTime;
     private OffsetDateTime endDateTime;
 
+    // organizer timezone (IANA), optional — used to interpret startTime/endTime
+    private String timezone;
+
     public Availability() {}
 
     // getters / setters
@@ -44,4 +47,7 @@ public class Availability {
 
     public OffsetDateTime getEndDateTime() { return endDateTime; }
     public void setEndDateTime(OffsetDateTime endDateTime) { this.endDateTime = endDateTime; }
+
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
 }

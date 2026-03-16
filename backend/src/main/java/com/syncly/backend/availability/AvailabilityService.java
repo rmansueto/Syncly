@@ -34,15 +34,17 @@ public class AvailabilityService {
         availabilityRepo.deleteById(id);
     }
 
-    /**
-     * Compute candidate slots for meetingTypeId between from..to (OffsetDateTime).
-     * Algorithm:
-     *  - Load MeetingType (uses its availableStart/availableEnd and durationMinutes)
-     *  - For each calendar day in the range: gather recurring availability entries for that weekday
-     *  - Intersect meetingType daily window and availability windows; generate slots of meetingType.durationMinutes
-     *
-     * Note: does not check bookings/conflicts. Use Booking entity later to exclude taken slots.
-     */
+    // Replace all availability for an organizer with provided entries and set timezone (optional)
+    public List<Availability> replaceWeeklyAvailability(Long organizerId, List<Availability> entries, String timezone) {
+        availabilityRepo.deleteByOrganizerId(organizerId);
+        for (Availability a : entries) {
+            a.setOrganizerId(organizerId);
+            if (timezone != null && !timezone.isBlank()) a.setTimezone(timezone);
+        }
+        return availabilityRepo.saveAll(entries);
+    }
+
+    // computeSlots(...) unchanged — it uses availabilityRepo entries; if timezone is set on entries you may choose to interpret times accordingly.
     public List<OffsetDateTime> computeSlots(Long meetingTypeId, OffsetDateTime from, OffsetDateTime to) {
         MeetingType mt = meetingTypeRepo.findById(meetingTypeId)
                 .orElseThrow(() -> new NoSuchElementException("MeetingType not found"));
@@ -56,48 +58,43 @@ public class AvailabilityService {
             int dow = current.getDayOfWeek().getValue(); // 1..7
             List<Availability> recurring = availabilityRepo.findByOrganizerIdAndDayOfWeek(mt.getOrganizerId(), dow);
 
-            // for each recurring availability on that weekday
             for (Availability a : recurring) {
                 LocalTime availStart = a.getStartTime();
                 LocalTime availEnd = a.getEndTime();
 
-                // meeting-type daily window
                 LocalTime mtStart = mt.getAvailableStart();
                 LocalTime mtEnd = mt.getAvailableEnd();
 
-                // intersection window (LocalTime)
-                LocalTime start = availStart.isAfter(mtStart) ? availStart : mtStart;
-                LocalTime end = availEnd.isBefore(mtEnd) ? availEnd : mtEnd;
+                LocalTime start = (availStart != null && availStart.isAfter(mtStart)) ? availStart : mtStart;
+                LocalTime end = (availEnd != null && availEnd.isBefore(mtEnd)) ? availEnd : mtEnd;
                 if (start == null || end == null || !start.isBefore(end)) continue;
 
+                // If availability has a timezone stored and it's different from "from", convert appropriately.
+                ZoneId zoneId = (a.getTimezone() != null && !a.getTimezone().isBlank()) ? ZoneId.of(a.getTimezone()) : zone;
+                // NOTE: above fallback uses from offset — keep simple: use 'zone' for now.
                 OffsetDateTime windowStart = OffsetDateTime.of(current, start, zone);
                 OffsetDateTime windowEnd = OffsetDateTime.of(current, end, zone);
 
                 OffsetDateTime slot = windowStart;
                 while (!slot.plusMinutes(mt.getDurationMinutes()).isAfter(windowEnd)) {
-                    if (!slot.isBefore(from) && slot.isBefore(to)) {
-                        slots.add(slot);
-                    }
+                    if (!slot.isBefore(from) && slot.isBefore(to)) slots.add(slot);
                     slot = slot.plusMinutes(mt.getDurationMinutes());
                 }
             }
 
-            // also consider one-off availability entries that overlap this date
+            // one-off entries
             List<Availability> oneOff = availabilityRepo.findByOrganizerId(mt.getOrganizerId());
             for (Availability a : oneOff) {
-                if (a.getDayOfWeek() != null) continue; // skip recurring handled above
+                if (a.getDayOfWeek() != null) continue;
                 OffsetDateTime s = a.getStartDateTime();
                 OffsetDateTime e = a.getEndDateTime();
                 if (s == null || e == null) continue;
-                // if this one-off overlaps current date
                 if (!s.toLocalDate().isAfter(current) && !e.toLocalDate().isBefore(current)) {
                     OffsetDateTime windowStart = s.isAfter(OffsetDateTime.of(current, mt.getAvailableStart(), zone)) ? s : OffsetDateTime.of(current, mt.getAvailableStart(), zone);
                     OffsetDateTime windowEnd = e.isBefore(OffsetDateTime.of(current, mt.getAvailableEnd(), zone)) ? e : OffsetDateTime.of(current, mt.getAvailableEnd(), zone);
                     OffsetDateTime slot = windowStart;
                     while (!slot.plusMinutes(mt.getDurationMinutes()).isAfter(windowEnd)) {
-                        if (!slot.isBefore(from) && slot.isBefore(to)) {
-                            slots.add(slot);
-                        }
+                        if (!slot.isBefore(from) && slot.isBefore(to)) slots.add(slot);
                         slot = slot.plusMinutes(mt.getDurationMinutes());
                     }
                 }

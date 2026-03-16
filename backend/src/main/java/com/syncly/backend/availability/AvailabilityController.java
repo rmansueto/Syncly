@@ -1,8 +1,13 @@
 package com.syncly.backend.availability;
 
+import com.syncly.backend.user.User;
+import com.syncly.backend.user.UserService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.security.Principal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -12,9 +17,11 @@ import java.util.Optional;
 public class AvailabilityController {
 
     private final AvailabilityService service;
+    private final UserService userService;
 
-    public AvailabilityController(AvailabilityService service) {
+    public AvailabilityController(AvailabilityService service, UserService userService) {
         this.service = service;
+        this.userService = userService;
     }
 
     @PostMapping
@@ -23,8 +30,16 @@ public class AvailabilityController {
     }
 
     @GetMapping
-    public List<Availability> list(@RequestParam Optional<Long> organizerId) {
-        return organizerId.map(service::listForOrganizer).orElseGet(() -> List.of());
+    public List<Availability> list(@RequestParam Optional<Long> organizerId, Principal principal) {
+        if (organizerId.isPresent()) {
+            return service.listForOrganizer(organizerId.get());
+        }
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        User user = userService.findByEmail(principal.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        return service.listForOrganizer(user.getId());
     }
 
     @GetMapping("/{id}")
@@ -38,11 +53,22 @@ public class AvailabilityController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Compute available slots for a meeting type between from..to
-     * Example:
-     * GET /api/availability/slots?meetingTypeId=1&from=2026-03-16T00:00:00+00:00&to=2026-03-18T00:00:00+00:00
-     */
+    // Bulk replace: replace all availability for the current (authenticated) organizer with the provided list
+    @PostMapping("/bulk")
+    public ResponseEntity<List<Availability>> bulkReplace(
+            Principal principal,
+            @RequestParam(required = false) String timezone,
+            @RequestBody List<Availability> entries
+    ) {
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        User user = userService.findByEmail(principal.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        List<Availability> saved = service.replaceWeeklyAvailability(user.getId(), entries, timezone);
+        return ResponseEntity.ok(saved);
+    }
+
     @GetMapping("/slots")
     public ResponseEntity<List<OffsetDateTime>> slots(
             @RequestParam Long meetingTypeId,
