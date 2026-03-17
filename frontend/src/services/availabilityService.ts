@@ -1,17 +1,4 @@
-import axios from "axios";
-
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080/api";
-const client = axios.create({ baseURL: API_URL });
-
-// attach token for every request
-client.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-});
+import client from "./api";
 
 export interface AvailabilityPayload {
   dayOfWeek?: number;
@@ -32,7 +19,6 @@ export const bulkReplaceAvailability = async (payload: AvailabilityPayload[], ti
   const resp = await client.post(`/availability/bulk${tzQuery}`, payload);
   return resp.data as AvailabilityPayload[];
 };
-
 export const fetchAvailabilityByOrganizer = async () => {
   const resp = await client.get(`/availability`);
   return resp.data as AvailabilityPayload[];
@@ -41,4 +27,14 @@ export const fetchAvailabilityByOrganizer = async () => {
 export const fetchAvailabilitySlots = async (meetingTypeId: number, from: string, to: string) => {
   const resp = await client.get(`/availability/slots?meetingTypeId=${meetingTypeId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   return resp.data as string[];
+};
+
+export const updateAvailability = async (id: number, payload: AvailabilityPayload) => {
+  const resp = await client.put(`/availability/${id}`, payload);
+  return resp.data;
+};
+
+export const deleteAvailability = async (id: number) => {
+  const resp = await client.delete(`/availability/${id}`);
+  return resp.data;
 };

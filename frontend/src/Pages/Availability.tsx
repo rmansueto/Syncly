@@ -22,59 +22,79 @@ const COMMON_TZ = [
   "Australia/Sydney",
 ];
 
+// Type for each time range
+type TimeRange = {
+  start: string;
+  end: string;
+};
+
 export default function Availability() {
   const [meetingTypes, setMeetingTypes] = useState<any[]>([]);
   const [timezone, setTimezone] = useState<string>(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-  const [weekly, setWeekly] = useState<Record<number, { start: string; end: string }[]>>(() => {
-    const init: Record<number, { start: string; end: string }[]> = {};
+  const [weekly, setWeekly] = useState<Record<number, TimeRange[]>>(() => {
+    const init: Record<number, TimeRange[]> = {};
     for (let d = 1; d <= 7; d++) init[d] = [];
     return init;
   });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
+  // Fetch meeting types (if needed)
   useEffect(() => {
     (async () => {
       try {
         const data = await fetchMeetingTypes();
         setMeetingTypes(data);
-      } catch (e:any) { /* ignore */ }
+      } catch (e:any) {}
     })();
   }, []);
 
-  // Load existing availability for the current logged-in user
+  // Load existing availability for current user
   useEffect(() => {
     (async () => {
       try {
         const entries = await fetchAvailabilityByOrganizer();
-        const map: Record<number, { start: string; end: string }[]> = {};
-        for (let d=1; d<=7; d++) map[d]=[];
+        const map: Record<number, TimeRange[]> = {};
+        for (let d = 1; d <= 7; d++) map[d] = [];
+
         let foundTz: string | undefined;
         for (const e of entries) {
           if (e.timezone) foundTz = e.timezone;
+
           if (e.dayOfWeek) {
-            const start = (e.startTime || "09:00:00").length === 8 ? e.startTime!.slice(0,5) : (e.startTime || "09:00");
-            const end = (e.endTime || "17:00:00").length === 8 ? e.endTime!.slice(0,5) : (e.endTime || "17:00");
-            map[e.dayOfWeek] = [...(map[e.dayOfWeek]||[]), { start, end }];
+            const start = (e.startTime || "09:00:00").slice(0,5);
+            const end = (e.endTime || "17:00:00").slice(0,5);
+            map[e.dayOfWeek] = [...(map[e.dayOfWeek] || []), { start, end }];
           }
         }
         setWeekly(map);
         if (foundTz) setTimezone(foundTz);
       } catch (e:any) {
-        // ignore (no entries / not logged in)
+        // ignore
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
 
-  const addRange = (day:number) => {
-    setWeekly(prev => ({ ...prev, [day]: [...(prev[day]||[]), { start: "09:00", end: "17:00" }] }));
+  const addRange = (day: number) => {
+    setWeekly(prev => ({
+      ...prev,
+      [day]: [...(prev[day] || []), { start: "09:00", end: "17:00" }]
+    }));
   };
-  const removeRange = (day:number, idx:number) => {
-    setWeekly(prev => ({ ...prev, [day]: prev[day].filter((_,i)=>i!==idx) }));
+
+  const removeRange = (day: number, idx: number) => {
+    setWeekly(prev => ({
+      ...prev,
+      [day]: prev[day].filter((_, i) => i !== idx)
+    }));
   };
-  const setRange = (day:number, idx:number, field:"start"|"end", value:string) => {
+
+  const setRange = (day: number, idx: number, field: "start" | "end", value: string) => {
     setWeekly(prev => {
       const copy = { ...prev };
-      copy[day] = copy[day].map((r,i)=> i===idx ? { ...r, [field]: value } : r);
+      copy[day] = copy[day].map((r, i) => i === idx ? { ...r, [field]: value } : r);
       return copy;
     });
   };
@@ -90,29 +110,30 @@ export default function Availability() {
             dayOfWeek: day,
             startTime: r.start.length === 5 ? r.start + ":00" : r.start,
             endTime: r.end.length === 5 ? r.end + ":00" : r.end,
+            timezone
           });
         }
       }
       await bulkReplaceAvailability(payload, timezone);
-      alert("Weekly availability saved");
+      alert("Weekly availability saved!");
     } catch (e:any) {
       setError(e?.response?.data?.message || e.message || "Save failed");
     }
   };
 
+  if (loading) return <div>Loading...</div>;
+
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-4">Working hours (weekly)</h1>
+      <h1 className="text-2xl font-semibold mb-4">Weekly Availability</h1>
       {error && <div className="text-red-600 mb-3">{error}</div>}
 
-      <div className="mb-4 grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm">Timezone</label>
-          <select value={timezone} onChange={e=>setTimezone(e.target.value)} className="border p-2 w-60">
-            <option value={timezone}>{timezone}</option>
-            {COMMON_TZ.map(t => t !== timezone && <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
+      <div className="mb-4">
+        <label className="block text-sm mb-1">Timezone</label>
+        <select value={timezone} onChange={e=>setTimezone(e.target.value)} className="border p-2 w-60">
+          <option value={timezone}>{timezone}</option>
+          {COMMON_TZ.map(t => t !== timezone && <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
 
       <div className="space-y-3 mb-4">
@@ -135,8 +156,14 @@ export default function Availability() {
       </div>
 
       <div className="flex gap-3">
-        <button onClick={handleSaveWeekly} className="bg-indigo-600 text-white px-4 py-2 rounded">Save weekly hours</button>
-        <button onClick={() => { setWeekly(() => { const init: Record<number, { start:string; end:string }[]> = {}; for (let d=1;d<=7;d++) init[d]=[]; return init; }); }} className="px-4 py-2 border rounded">Clear</button>
+        <button onClick={handleSaveWeekly} className="bg-indigo-600 text-white px-4 py-2 rounded">Save Changes</button>
+        <button onClick={() => {
+          setWeekly(() => {
+            const init: Record<number, TimeRange[]> = {};
+            for (let d=1; d<=7; d++) init[d] = [];
+            return init;
+          });
+        }} className="px-4 py-2 border rounded">Clear</button>
       </div>
     </div>
   );

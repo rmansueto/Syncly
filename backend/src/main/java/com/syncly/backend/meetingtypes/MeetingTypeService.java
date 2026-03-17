@@ -35,7 +35,12 @@ public class MeetingTypeService {
     }
 
     public List<MeetingType> list(Optional<Long> organizerId) {
-        return organizerId.map(repo::findByOrganizerId).orElseGet(repo::findAll);
+        if (organizerId.isPresent()) {
+            return repo.findByOrganizerId(organizerId.get());
+        } else {
+            // Do NOT return all by default
+            return List.of(); // or throw an exception
+        }
     }
 
     public Optional<MeetingType> get(Long id) {

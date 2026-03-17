@@ -36,8 +36,15 @@ public class MeetingTypeController {
     }
 
     @GetMapping
-    public List<MeetingType> list(@RequestParam Optional<Long> organizerId) {
-        return service.list(organizerId);
+    public List<MeetingType> list(Principal principal) {
+        if (principal == null) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
+
+        User user = userService.findByEmail(principal.getName())
+                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED));
+
+        return service.list(Optional.of(user.getId()));
     }
 
     @GetMapping("/{id}")

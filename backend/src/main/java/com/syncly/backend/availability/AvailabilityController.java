@@ -25,7 +25,16 @@ public class AvailabilityController {
     }
 
     @PostMapping
-    public ResponseEntity<Availability> create(@RequestBody Availability a) {
+    public ResponseEntity<Availability> create(@RequestBody Availability a, Principal principal) {
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+
+        User user = userService.findByEmail(principal.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+        a.setOrganizerId(user.getId());
+
         return ResponseEntity.status(201).body(service.create(a));
     }
 
@@ -48,7 +57,21 @@ public class AvailabilityController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id, Principal principal) {
+        if (principal == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+
+        User user = userService.findByEmail(principal.getName())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+
+        Availability existing = service.get(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        if (existing.getOrganizerId() == null || !existing.getOrganizerId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

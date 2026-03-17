@@ -1,24 +1,11 @@
-import axios from "axios";
-
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080/api";
-const client = axios.create({ baseURL: API_URL });
-
-// attach token for every request (reads token from localStorage at request time)
-client.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers["Authorization"] = `Bearer ${token}`;
-  }
-  return config;
-}, (err) => Promise.reject(err));
+import client from "./api";
 
 export interface MeetingTypePayload {
   title: string;
   description?: string;
   durationMinutes: number;
-  availableStart?: string; // "HH:mm"
-  availableEnd?: string;   // "HH:mm"
+  availableStart?: string;
+  availableEnd?: string;
   active?: boolean;
 }
 
