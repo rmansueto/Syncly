@@ -14,6 +14,7 @@ export default function MeetingTypes() {
   const [error, setError] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null); // track which card menu is open
 
   // form state for drawer
   const [title, setTitle] = useState("");
@@ -32,17 +33,16 @@ export default function MeetingTypes() {
   const load = async () => {
     try {
       const data = await fetchMeetingTypes();
-      // treat types as active unless they explicitly have active === false
       const activeOnly = data.filter((m: any) => m.active !== false);
       setList(activeOnly);
-    } catch (e:any) {
+    } catch (e: any) {
       setError(e?.response?.data?.message || e.message || "Failed to load meeting types");
     }
   };
 
   useEffect(() => { load(); }, []);
 
-  // load current user's weekly availability to show in drawer
+  // load current user's weekly availability
   useEffect(() => {
     (async () => {
       try {
@@ -123,7 +123,6 @@ export default function MeetingTypes() {
 
   // helper to render availability summary
   const renderAvailabilitySummary = () => {
-    // for compact summary show days with ranges or "Unavailable"
     return (
       <div className="text-sm text-slate-600">
         {Object.entries(weekly).map(([k, ranges]) => {
@@ -139,6 +138,13 @@ export default function MeetingTypes() {
       </div>
     );
   };
+
+  // close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
 
   return (
     <div className="p-6">
@@ -161,21 +167,29 @@ export default function MeetingTypes() {
                 <div className="text-xs text-slate-400 mt-1">Host: You</div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* settings menu */}
-                <div className="relative">
-                  <button className="text-slate-500 hover:text-slate-700">⋯</button>
-                  <div className="hidden group-hover:block absolute right-0 mt-2 w-36 bg-white border rounded shadow z-10">
+              {/* Settings menu */}
+              <div className="relative">
+                <button
+                  className="text-slate-500 hover:text-slate-700"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId(openMenuId === m.id ? null : m.id);
+                  }}
+                >
+                  ⋯
+                </button>
+                {openMenuId === m.id && (
+                  <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow z-10">
                     <button onClick={() => openEdit(m)} className="w-full text-left px-3 py-2 hover:bg-slate-50">Edit</button>
                     <button onClick={() => handleDelete(m.id)} className="w-full text-left px-3 py-2 text-red-600 hover:bg-slate-50">Delete</button>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
             {/* hover quick actions: Book / Share */}
             <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition flex gap-2">
-              <Link to={`/book/${m.id}`} className="bg-white border px-3 py-1 rounded shadow-sm text-sm hover:bg-slate-50">Book</Link>
+              <Link to={`/booking/${m.id}`} className="bg-white border px-3 py-1 rounded shadow-sm text-sm hover:bg-slate-50">Book</Link>
               <button className="bg-white border px-3 py-1 rounded shadow-sm text-sm hover:bg-slate-50">Share</button>
             </div>
           </div>

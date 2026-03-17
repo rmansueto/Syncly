@@ -5,6 +5,7 @@ import Dashboard from "./Pages/Dashboard";
 import Landing from "./Pages/Landing";
 import Availability from "./Pages/Availability";
 import MeetingTypes from "./Pages/MeetingTypes";
+import Booking from "./Pages/Booking";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="meeting-types" element={<MeetingTypes />} />
           <Route path="availability" element={<Availability />} />
         </Route>
+        <Route path="/booking/:id" element={<Booking />} />
 
       </Routes>
     </BrowserRouter>
