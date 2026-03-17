@@ -1,176 +1,209 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchMeetingTypes } from "../services/meetingService";
-import { createBooking } from "../services/bookingService";
-import { fetchAvailabilityByOrganizer, AvailabilityPayload } from "../services/availabilityService";
-
-interface MeetingType {
-  id: number;
-  title: string;
-  description: string;
-  durationMinutes: number;
-  availableStart?: string;
-  availableEnd?: string;
-  active: boolean;
-}
+import { createBooking, fetchBookedSlots } from "../services/bookingService";
+import {
+  fetchAvailabilityByOrganizer,
+  AvailabilityPayload,
+} from "../services/availabilityService";
 
 export default function Booking() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
 
-  const [meetingType, setMeetingType] = useState<MeetingType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [weeklyAvailability, setWeeklyAvailability] = useState<Record<number, { start: string; end: string }[]>>(() => {
-    const init: Record<number, { start: string; end: string }[]> = {};
-    for (let d = 1; d <= 7; d++) init[d] = [];
-    return init;
-  });
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [meetingType, setMeetingType] = useState<any>(null);
+  const [weeklyAvailability, setWeeklyAvailability] = useState<any>({});
+  const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
+  const [email, setEmail] = useState("");
+  const [showModal, setShowModal] = useState(false);
   const [weekDates, setWeekDates] = useState<Date[]>([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
-      try {
-        // Load meeting type
-        const types = await fetchMeetingTypes();
-        const mt = types.find((m: MeetingType) => m.id === Number(id));
-        if (!mt) throw new Error("Meeting type not found");
-        setMeetingType(mt);
-        generateWeekDates(new Date());
+      const types = await fetchMeetingTypes();
+      const mt = types.find((m: any) => m.id === Number(id));
+      setMeetingType(mt);
 
-        // Load weekly availability safely
-        const entries: AvailabilityPayload[] = await fetchAvailabilityByOrganizer();
-        const map: Record<number, { start: string; end: string }[]> = {};
-        for (let d = 1; d <= 7; d++) map[d] = [];
+      const entries: AvailabilityPayload[] =
+        await fetchAvailabilityByOrganizer();
 
-        for (const e of entries) {
-          if (e.dayOfWeek != null) {
-            // fallback to default if undefined
-            const start = (e.startTime ?? "09:00").slice(0, 5);
-            const end = (e.endTime ?? "17:00").slice(0, 5);
-            map[e.dayOfWeek] = [...(map[e.dayOfWeek] || []), { start, end }];
-          }
+      const map: any = {};
+      for (let d = 0; d < 7; d++) map[d] = [];
+
+      for (const e of entries) {
+        if (e.dayOfWeek != null) {
+          const start = (e.startTime ?? "09:00").slice(0, 5);
+          const end = (e.endTime ?? "17:00").slice(0, 5);
+          map[e.dayOfWeek].push({ start, end });
         }
-
-        setWeeklyAvailability(map);
-      } catch (e: any) {
-        setError(e?.message || "Failed to load meeting type or availability");
-      } finally {
-        setLoading(false);
       }
+      setWeeklyAvailability(map);
+
+      generateWeekDates(new Date());
     })();
   }, [id]);
 
+  // Fetch booked slots when date changes
+  useEffect(() => {
+    if (!selectedDate || !meetingType) return;
+
+    (async () => {
+      const bookings = await fetchBookedSlots(meetingType.id, selectedDate);
+      const times = bookings.map((b) => b.time.slice(0, 5));
+      setBookedTimes(times);
+    })();
+  }, [selectedDate, meetingType]);
+
   const generateWeekDates = (current: Date) => {
-    const week: Date[] = [];
-    const day = current.getDay(); // 0 = Sun
-    for (let i = 1; i <= 7; i++) {
-      const diff = i - day;
+    const days: Date[] = [];
+    for (let i = 0; i < 7; i++) {
       const d = new Date(current);
-      d.setDate(current.getDate() + diff);
-      week.push(d);
+      d.setDate(current.getDate() + i);
+      days.push(d);
     }
-    setWeekDates(week);
+    setWeekDates(days);
   };
 
-  const getTimeSlots = (start: string, end: string, duration: number) => {
+  const getSlots = (start: string, end: string, duration: number) => {
     const slots: string[] = [];
     let [h, m] = start.split(":").map(Number);
-    const [endH, endM] = end.split(":").map(Number);
-    while (h < endH || (h === endH && m + duration <= endM)) {
-      slots.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+    const [eh, em] = end.split(":").map(Number);
+
+    while (h < eh || (h === eh && m + duration <= em)) {
+      slots.push(
+        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+      );
       m += duration;
       if (m >= 60) {
-        h += 1;
+        h++;
         m -= 60;
       }
     }
     return slots;
   };
 
-  const handleBooking = async () => {
-    if (!selectedDate || !selectedTime) {
-      setError("Select a date and time");
-      return;
-    }
+  const handleConfirmBooking = async () => {
     try {
       await createBooking({
-        meetingTypeId: meetingType!.id,
+        meetingTypeId: meetingType.id,
         date: selectedDate,
         time: selectedTime,
+        email,
       });
-      alert("Booking successful!");
+      alert("Booking confirmed!");
       navigate("/");
     } catch (e: any) {
-      setError(e?.response?.data?.message || e.message || "Booking failed");
+      setError(e?.message || "Booking failed");
     }
   };
 
-  if (loading) return <div className="p-6">Loading...</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
-  if (!meetingType) return null;
+  if (!meetingType) return <div className="p-6">Loading...</div>;
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-2">{meetingType.title}</h1>
-      <p className="text-sm text-slate-600 mb-1">{meetingType.description}</p>
-      <p className="text-sm text-slate-600 mb-4">Duration: {meetingType.durationMinutes} minutes</p>
+      <h1 className="text-xl font-bold">{meetingType.title}</h1>
+      <p>{meetingType.description}</p>
+      <p>{meetingType.durationMinutes} mins</p>
 
-      <div className="mb-4">
-        <div className="text-sm font-medium mb-2">Select a date</div>
-        <div className="grid grid-cols-7 gap-2">
-          {weekDates.map((d) => {
-            const dateStr = d.toISOString().slice(0, 10);
-            const dayNum = d.getDay();
-            const availableRanges = weeklyAvailability[dayNum] || [];
-            const isDisabled = availableRanges.length === 0;
-            const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dayNum];
-            return (
-              <button
-                key={dateStr}
-                onClick={() => !isDisabled && (setSelectedDate(dateStr), setSelectedTime(""))}
-                disabled={isDisabled}
-                className={`p-2 border rounded text-sm ${selectedDate === dateStr ? "bg-indigo-600 text-white" : ""} ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}
-              >
-                <div>{dayName}</div>
-                <div>{d.getDate()}</div>
-              </button>
-            );
-          })}
-        </div>
+      {/* DATE */}
+      <div className="grid grid-cols-7 gap-2 mt-4">
+        {weekDates.map((d) => {
+          const dateStr = d.toISOString().slice(0, 10);
+          const day = d.getDay();
+          const disabled = weeklyAvailability[day]?.length === 0;
+          return (
+            <button
+              key={dateStr}
+              disabled={disabled}
+              onClick={() => {
+                setSelectedDate(dateStr);
+                setSelectedTime("");
+              }}
+              className={`p-2 border rounded
+                ${selectedDate === dateStr ? "bg-indigo-600 text-white" : ""}
+                ${disabled ? "opacity-30" : ""}`}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
       </div>
 
-      {selectedDate && weeklyAvailability[new Date(selectedDate).getDay()]?.length > 0 && (
-        <div className="mb-4">
-          <div className="text-sm font-medium mb-2">Available time slots</div>
-          <div className="grid grid-cols-4 gap-2">
-            {weeklyAvailability[new Date(selectedDate).getDay()]!.flatMap(range =>
-              getTimeSlots(range.start, range.end, meetingType.durationMinutes)
-            ).map(slot => (
-              <button
-                key={slot}
-                onClick={() => setSelectedTime(slot)}
-                className={`p-2 border rounded text-sm ${selectedTime === slot ? "bg-indigo-600 text-white" : ""}`}
-              >
-                {slot}
-              </button>
-            ))}
-          </div>
+      {/* TIME */}
+      {selectedDate && (
+        <div className="grid grid-cols-4 gap-2 mt-4">
+          {weeklyAvailability[new Date(selectedDate).getDay()]
+            ?.flatMap((r: any) =>
+              getSlots(r.start, r.end, meetingType.durationMinutes)
+            )
+            .map((t: string) => {
+              const taken = bookedTimes.includes(t);
+              return (
+                <button
+                  key={t}
+                  disabled={taken}
+                  onClick={() => setSelectedTime(t)}
+                  className={`border p-2 rounded
+                    ${selectedTime === t ? "bg-indigo-600 text-white" : ""}
+                    ${taken ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "hover:bg-indigo-50"}
+                  `}
+                >
+                  {t}
+                </button>
+              );
+            })}
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <button onClick={handleBooking} className="bg-indigo-600 text-white px-4 py-2 rounded">
+      {/* BOOK BUTTON */}
+      {selectedTime && (
+        <button
+          onClick={() => setShowModal(true)}
+          className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded"
+        >
           Book
         </button>
-        <button onClick={() => navigate(-1)} className="px-4 py-2 border rounded">
-          Cancel
-        </button>
-      </div>
+      )}
 
-      {error && <div className="mt-4 text-red-600">{error}</div>}
+      {/* MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded w-80">
+            <h2 className="font-semibold mb-2">Confirm Booking</h2>
+            <p className="text-sm mb-2">
+              {selectedDate} at {selectedTime}
+            </p>
+
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="border p-2 w-full mb-3"
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmBooking}
+                className="bg-indigo-600 text-white px-3 py-2 rounded"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setShowModal(false)}
+                className="border px-3 py-2 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {error && <div className="text-red-500 mt-2">{error}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
