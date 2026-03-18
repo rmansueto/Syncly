@@ -6,6 +6,7 @@ import Landing from "./Pages/Landing";
 import Availability from "./Pages/Availability";
 import MeetingTypes from "./Pages/MeetingTypes";
 import Booking from "./Pages/Booking";
+import Profile from "./Pages/Profile";
 
 function App() {
   return (
@@ -22,7 +23,7 @@ function App() {
           <Route path="availability" element={<Availability />} />
         </Route>
         <Route path="/booking/:id" element={<Booking />} />
-
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </BrowserRouter>
   );

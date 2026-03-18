@@ -17,6 +17,9 @@ public class User {
     private String password;
 
     private String fullName;
+    
+    @Column(nullable = true)
+    private String photoUrl;
 
     public User() {}
     public User(String email, String password, String fullName) {
@@ -33,4 +36,8 @@ public class User {
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+
 }

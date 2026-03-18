@@ -33,7 +33,9 @@ public class UserService implements UserDetailsService {
     public Optional<User> findByEmail(String email) {
         return repo.findByEmail(email);
     }
-
+    public User save(User user) {
+        return repo.save(user);
+    }
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User u = repo.findByEmail(username).orElseThrow(() ->
