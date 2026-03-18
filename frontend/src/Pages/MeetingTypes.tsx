@@ -6,260 +6,246 @@ import {
   deleteMeetingType,
   MeetingTypePayload,
 } from "../services/meetingService";
-import { fetchAvailabilityByOrganizer } from "../services/availabilityService";
 import { Link } from "react-router-dom";
+import { 
+  PlusIcon, 
+  EllipsisVerticalIcon, 
+  ClockIcon, 
+  LinkIcon, 
+  CalendarIcon,
+  TrashIcon,
+  PencilSquareIcon,
+  XMarkIcon,
+  CheckIcon
+} from "@heroicons/react/24/outline";
 
 export default function MeetingTypes() {
   const [list, setList] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null); // track which card menu is open
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  // form state for drawer
+  // Form state
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState<number>(30);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("17:00");
   const [description, setDescription] = useState("");
   const [useWorkingHours, setUseWorkingHours] = useState(true);
-  const [weekly, setWeekly] = useState<Record<number, { start: string; end: string }[]>>(() => {
-    const init: Record<number, { start: string; end: string }[]> = {};
-    for (let d = 1; d <= 7; d++) init[d] = [];
-    return init;
-  });
-  const [timezone, setTimezone] = useState<string>(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
 
   const load = async () => {
     try {
       const data = await fetchMeetingTypes();
-      const activeOnly = data.filter((m: any) => m.active !== false);
-      setList(activeOnly);
+      setList(data.filter((m: any) => m.active !== false));
     } catch (e: any) {
-      setError(e?.response?.data?.message || e.message || "Failed to load meeting types");
+      setError("Failed to load meeting types");
     }
   };
 
   useEffect(() => { load(); }, []);
 
-  // load current user's weekly availability
-  useEffect(() => {
-    (async () => {
-      try {
-        const entries = await fetchAvailabilityByOrganizer();
-        const map: Record<number, { start: string; end: string }[]> = {};
-        for (let d=1; d<=7; d++) map[d]=[];
-        let foundTz: string | undefined;
-        for (const e of entries) {
-          if (e.timezone) foundTz = e.timezone;
-          if (e.dayOfWeek) {
-            const start = (e.startTime || "09:00:00").length === 8 ? e.startTime!.slice(0,5) : (e.startTime || "09:00");
-            const end = (e.endTime || "17:00:00").length === 8 ? e.endTime!.slice(0,5) : (e.endTime || "17:00");
-            map[e.dayOfWeek] = [...(map[e.dayOfWeek]||[]), { start, end }];
-          }
-        }
-        setWeekly(map);
-        if (foundTz) setTimezone(foundTz);
-      } catch (e:any) {
-        // ignore if not logged in or no availability
-      }
-    })();
-  }, []);
+  const handleCopyLink = (id: number) => {
+    const url = `${window.location.origin}/booking/${id}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const openCreate = () => {
-    setEditing(null);
-    setTitle("");
-    setDuration(30);
-    setStart("09:00");
-    setEnd("17:00");
-    setDescription("");
-    setUseWorkingHours(true);
-    setDrawerOpen(true);
+    setEditing(null); setTitle(""); setDuration(30); setDescription("");
+    setUseWorkingHours(true); setDrawerOpen(true);
   };
 
   const openEdit = (m: any) => {
-    setEditing(m);
-    setTitle(m.title || "");
-    setDuration(m.durationMinutes || 30);
-    setStart(m.availableStart || "09:00");
-    setEnd(m.availableEnd || "17:00");
-    setDescription(m.description || "");
-    setUseWorkingHours(true);
+    setEditing(m); setTitle(m.title); setDuration(m.durationMinutes);
+    setDescription(m.description); setStart(m.availableStart || "09:00");
+    setEnd(m.availableEnd || "17:00"); setUseWorkingHours(!m.availableStart);
     setDrawerOpen(true);
   };
 
-  const handleCreateOrUpdate = async () => {
-    setError("");
+  const handleSave = async () => {
     try {
       const payload: MeetingTypePayload = {
-        title,
-        description,
-        durationMinutes: duration,
+        title, description, durationMinutes: duration,
         availableStart: useWorkingHours ? undefined : start,
         availableEnd: useWorkingHours ? undefined : end,
         active: true,
       };
-      if (editing?.id) {
-        await updateMeetingType(editing.id, payload);
-      } else {
-        await createMeetingType(payload);
-      }
-      setDrawerOpen(false);
-      await load();
-    } catch (e:any) {
-      setError(e?.response?.data?.message || e.message || "Save failed");
-    }
+      editing ? await updateMeetingType(editing.id, payload) : await createMeetingType(payload);
+      setDrawerOpen(false); load();
+    } catch (e) { setError("Save failed"); }
   };
-
-  const handleDelete = async (id:number) => {
-    if (!window.confirm("Delete this event type?")) return;
-    try {
-      await deleteMeetingType(id);
-      await load();
-    } catch (e:any) {
-      setError(e?.response?.data?.message || e.message || "Delete failed");
-    }
-  };
-
-  // helper to render availability summary
-  const renderAvailabilitySummary = () => {
-    return (
-      <div className="text-sm text-slate-600">
-        {Object.entries(weekly).map(([k, ranges]) => {
-          if (!ranges || ranges.length === 0) return null;
-          return (
-            <div key={k} className="flex items-center gap-2">
-              <div className="w-6 text-xs font-medium">{["","Mon","Tue","Wed","Thu","Fri","Sat","Sun"][Number(k)]}</div>
-              <div className="text-xs">{ranges.map(r => `${r.start}-${r.end}`).join(", ")}</div>
-            </div>
-          );
-        })}
-        {Object.values(weekly).every(r => r.length === 0) && <div className="text-sm text-slate-500">No weekly hours set</div>}
-      </div>
-    );
-  };
-
-  // close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => setOpenMenuId(null);
-    window.addEventListener("click", handleClickOutside);
-    return () => window.removeEventListener("click", handleClickOutside);
-  }, []);
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-semibold">Event Types</h1>
-        <div className="flex items-center gap-3">
-          {error && <div className="text-red-600 mr-4">{error}</div>}
-          <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded">+ New Event Type</button>
+    <div className="max-w-6xl mx-auto animate-in fade-in duration-500">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Event Types</h1>
+          <p className="text-slate-500 text-sm mt-1">Configure your availability and booking links.</p>
         </div>
+        <button 
+          onClick={openCreate} 
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-md shadow-indigo-100 active:scale-95"
+        >
+          <PlusIcon className="h-5 w-5" />
+          <span>New Event Type</span>
+        </button>
       </div>
 
-      <div className="grid gap-4">
-        {list.length === 0 && <div className="text-sm text-slate-500">No active event types yet.</div>}
-        {list.map((m:any) => (
-          <div key={m.id} className="group relative bg-white p-4 rounded shadow hover:shadow-md transition">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="font-semibold text-lg">{m.title}</div>
-                <div className="text-sm text-slate-600">{m.durationMinutes} min • {m.availableStart ?? "uses working hours"}</div>
-                <div className="text-xs text-slate-400 mt-1">Host: You</div>
-              </div>
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm flex items-center justify-between rounded-r-lg">
+          <span>{error}</span>
+          <button onClick={() => setError("")}><XMarkIcon className="h-4 w-4"/></button>
+        </div>
+      )}
 
-              {/* Settings menu */}
-              <div className="relative">
-                <button
-                  className="text-slate-500 hover:text-slate-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenMenuId(openMenuId === m.id ? null : m.id);
-                  }}
-                >
-                  ⋯
-                </button>
-                {openMenuId === m.id && (
-                  <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow z-10">
-                    <button onClick={() => openEdit(m)} className="w-full text-left px-3 py-2 hover:bg-slate-50">Edit</button>
-                    <button onClick={() => handleDelete(m.id)} className="w-full text-left px-3 py-2 text-red-600 hover:bg-slate-50">Delete</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* hover quick actions: Book / Share */}
-            <div className="absolute right-4 bottom-4 opacity-0 group-hover:opacity-100 transition flex gap-2">
-              <Link to={`/booking/${m.id}`} className="bg-white border px-3 py-1 rounded shadow-sm text-sm hover:bg-slate-50">Book</Link>
-              <button className="bg-white border px-3 py-1 rounded shadow-sm text-sm hover:bg-slate-50">Share</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Right drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1" onClick={() => setDrawerOpen(false)} />
-          <div className="w-96 bg-white shadow-xl p-6 flex flex-col">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">{editing ? "Edit Event Type" : "New Event Type"}</h2>
-              <button onClick={() => setDrawerOpen(false)} className="text-slate-500 hover:text-slate-700">✕</button>
-            </div>
-
-            <div className="mt-4 flex-1 overflow-auto">
-              <div className="mb-3">
-                <label className="block text-sm">Title</label>
-                <input value={title} onChange={e=>setTitle(e.target.value)} className="border p-2 w-full" />
-              </div>
-              <div className="mb-3">
-                <label className="block text-sm">Duration (minutes)</label>
-                <input type="number" value={duration} onChange={e=>setDuration(Number(e.target.value))} className="border p-2 w-40" />
-              </div>
-              <div className="mb-3">
-                <label className="block text-sm">Description</label>
-                <textarea value={description} onChange={e=>setDescription(e.target.value)} className="border p-2 w-full h-24" />
-              </div>
-
-              <div className="mb-3">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={useWorkingHours} onChange={e=>setUseWorkingHours(e.target.checked)} />
-                  Use my working hours
-                </label>
-                {!useWorkingHours && (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm">Start (HH:mm)</label>
-                      <input value={start} onChange={e=>setStart(e.target.value)} className="border p-2 w-full" />
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {list.map((m) => (
+          <div key={m.id} className="group relative bg-white rounded-2xl border border-slate-200 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-50 transition-all duration-300 overflow-hidden flex flex-col">
+            <div className="p-6 flex-1">
+              <div className="flex justify-between items-start mb-4">
+                <div className="h-10 w-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
+                  <CalendarIcon className="h-6 w-6" />
+                </div>
+                <div className="relative">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === m.id ? null : m.id); }}
+                    className="p-1 hover:bg-slate-100 rounded-md transition-colors"
+                  >
+                    <EllipsisVerticalIcon className="h-5 w-5 text-slate-400" />
+                  </button>
+                  {openMenuId === m.id && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-100 rounded-xl shadow-xl z-20 py-1 animate-in zoom-in-95 duration-150">
+                      <button onClick={() => openEdit(m)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                        <PencilSquareIcon className="h-4 w-4" /> Edit
+                      </button>
+                      <button onClick={() => deleteMeetingType(m.id).then(load)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                        <TrashIcon className="h-4 w-4" /> Delete
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm">End (HH:mm)</label>
-                      <input value={end} onChange={e=>setEnd(e.target.value)} className="border p-2 w-full" />
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-3">
-                  <div className="text-sm font-medium">Your weekly hours ({timezone})</div>
-                  <div className="mt-2 text-xs text-slate-600">
-                    {renderAvailabilitySummary()}
-                  </div>
+                  )}
                 </div>
               </div>
 
-              <div className="mb-3">
-                <label className="block text-sm">Host</label>
-                <div className="mt-1 text-sm">You</div>
+              <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{m.title}</h3>
+              <p className="text-slate-500 text-sm mt-1 line-clamp-2 min-h-[40px]">{m.description || "No description provided."}</p>
+              
+              <div className="mt-4 flex items-center gap-4 text-slate-400 text-sm font-medium">
+                <div className="flex items-center gap-1.5">
+                  <ClockIcon className="h-4 w-4" />
+                  <span>{m.durationMinutes}m</span>
+                </div>
+                <span className="text-slate-200">|</span>
+                <Link to={`/booking/${m.id}`} className="text-indigo-600 hover:underline decoration-2 underline-offset-4">View page</Link>
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <button onClick={handleCreateOrUpdate} className="bg-indigo-600 text-white px-4 py-2 rounded">
-                  {editing ? "Save" : "Create"}
-                </button>
-              </div>
-              <div>
-                <button onClick={() => setDrawerOpen(false)} className="px-4 py-2 border rounded">Cancel</button>
+            <div className="bg-slate-50 p-4 border-t border-slate-100 flex items-center justify-between">
+              <button 
+                onClick={() => handleCopyLink(m.id)}
+                className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors ${copiedId === m.id ? "text-emerald-600" : "text-slate-500 hover:text-indigo-600"}`}
+              >
+                {copiedId === m.id ? <CheckIcon className="h-4 w-4" /> : <LinkIcon className="h-4 w-4" />}
+                {copiedId === m.id ? "Copied!" : "Copy Link"}
+              </button>
+              <Link 
+                to={`/booking/${m.id}`} 
+                className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-white hover:border-indigo-600 hover:text-indigo-600 transition-all shadow-sm"
+              >
+                Book
+              </Link>
+            </div>
+          </div>
+        ))}
+        {/* Empty State */}
+        {list.length === 0 && (
+          <div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-3xl bg-white/50">
+            <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <PlusIcon className="h-8 w-8 text-slate-400" />
+            </div>
+            <p className="text-slate-500 font-medium">No event types created yet.</p>
+            <button onClick={openCreate} className="mt-4 text-indigo-600 font-bold hover:text-indigo-700 underline underline-offset-4">Create your first one</button>
+          </div>
+        )}
+      </div>
+
+      {/* Side Drawer */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-[100] overflow-hidden">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setDrawerOpen(false)} />
+          <div className="absolute inset-y-0 right-0 max-w-full flex">
+            <div className="w-screen max-w-md bg-white shadow-2xl animate-in slide-in-from-right duration-300">
+              <div className="h-full flex flex-col p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-bold text-slate-900">{editing ? "Edit Event" : "New Event"}</h2>
+                  <button onClick={() => setDrawerOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <XMarkIcon className="h-6 w-6 text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-hide">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Event Title</label>
+                    <input 
+                      placeholder="e.g. 15 Minute Discovery Call"
+                      value={title} onChange={e=>setTitle(e.target.value)} 
+                      className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 focus:border-indigo-600 outline-none transition-all font-medium" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Duration (Minutes)</label>
+                    <div className="flex gap-2">
+                      {[15, 30, 45, 60].map(m => (
+                        <button 
+                          key={m} 
+                          onClick={() => setDuration(m)}
+                          className={`flex-1 py-2 rounded-lg border-2 font-bold transition-all ${duration === m ? "bg-indigo-50 border-indigo-600 text-indigo-600" : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"}`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2 uppercase tracking-wide">Description</label>
+                    <textarea 
+                      rows={3}
+                      value={description} onChange={e=>setDescription(e.target.value)} 
+                      className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 focus:border-indigo-600 outline-none transition-all resize-none" 
+                    />
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input type="checkbox" className="sr-only peer" checked={useWorkingHours} onChange={e=>setUseWorkingHours(e.target.checked)} />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </div>
+                      <span className="text-sm font-bold text-slate-700 uppercase tracking-tight">Sync with Working Hours</span>
+                    </label>
+                    {!useWorkingHours && (
+                      <div className="mt-4 grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                        <input value={start} onChange={e=>setStart(e.target.value)} className="border-2 border-white rounded-lg p-2 text-center font-mono shadow-sm" />
+                        <input value={end} onChange={e=>setEnd(e.target.value)} className="border-2 border-white rounded-lg p-2 text-center font-mono shadow-sm" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-100 flex gap-3">
+                  <button onClick={handleSave} className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95">
+                    {editing ? "Update Event" : "Create Event Type"}
+                  </button>
+                  <button onClick={() => setDrawerOpen(false)} className="px-6 py-4 border-2 border-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-50 transition-all">
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
