@@ -36,6 +36,9 @@ public class UserService implements UserDetailsService {
     public User save(User user) {
         return repo.save(user);
     }
+    public void updatePassword(User user, String newRawPassword) {
+        user.setPassword(passwordEncoder.encode(newRawPassword));
+    }
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User u = repo.findByEmail(username).orElseThrow(() ->

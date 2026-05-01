@@ -1,7 +1,15 @@
 import React, { useState, useEffect, ChangeEvent, useRef } from "react";
-import { useNavigate } from "react-router-dom"; // Added for back button
+import { useNavigate } from "react-router-dom";
 import client from "../services/api";
-import { ArrowLeftIcon, CameraIcon, UserIcon } from "@heroicons/react/24/outline";
+import { 
+  ArrowLeftIcon, 
+  CameraIcon, 
+  UserIcon, 
+  EnvelopeIcon, 
+  LockClosedIcon, 
+  EyeIcon, 
+  EyeSlashIcon 
+} from "@heroicons/react/24/outline";
 
 interface User {
   id: number;
@@ -13,8 +21,12 @@ interface User {
 const Profile = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [user, setUser] = useState<User | null>(null);
   const [fullName, setFullName] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -39,9 +51,16 @@ const Profile = () => {
 
   const handleSave = async () => {
     if (!user) return;
+    
+    if (newPassword && newPassword !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+
     setSaving(true);
     const formData = new FormData();
     formData.append("fullName", fullName);
+    if (newPassword) formData.append("newPassword", newPassword);
     if (photo) formData.append("photo", photo);
 
     try {
@@ -49,6 +68,8 @@ const Profile = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setUser(res.data);
+      setNewPassword("");
+      setConfirmPassword("");
       alert("Profile updated successfully!");
     } catch (err) {
       console.error(err);
@@ -59,7 +80,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto py-8 px-4">
       {/* Back Button */}
       <button 
         onClick={() => navigate(-1)} 
@@ -104,6 +125,25 @@ const Profile = () => {
           </div>
 
           <div className="space-y-6">
+            {/* Displayed Email (Unchangeable) */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <EnvelopeIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="email"
+                  value={user?.email || ""}
+                  readOnly
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-100 rounded-xl bg-gray-50 text-gray-400 cursor-not-allowed sm:text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Full Name */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">
                 Full Name
@@ -117,8 +157,58 @@ const Profile = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all sm:text-sm"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all sm:text-sm"
                 />
+              </div>
+            </div>
+
+            {/* Password Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">
+                  New Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <LockClosedIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Leave blank to keep same"
+                    className="block w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all sm:text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-indigo-600"
+                  >
+                    {showPassword ? (
+                      <EyeSlashIcon className="h-5 w-5" />
+                    ) : (
+                      <EyeIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <LockClosedIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all sm:text-sm"
+                  />
+                </div>
               </div>
             </div>
 
