@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const client = axios.create({
-  baseURL: "http://localhost:8080/api",
-  withCredentials: true, // only if using cookies
+  baseURL: process.env.REACT_APP_URL || "http://localhost:8080/api",
+  withCredentials: true,
 });
 
 // Attach token from localStorage for all requests
