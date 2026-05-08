@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { LoginPayload, RegisterPayload, AuthResponse } from "../types/authTypes";
 
-const API_URL = "http://localhost:8080/api";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080/api";
 
 export const loginUser = async (data: LoginPayload): Promise<AuthResponse> => {
   const response = await axios.post<AuthResponse>(`${API_URL}/auth/login`, data);
