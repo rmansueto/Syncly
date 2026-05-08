@@ -11,7 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/availability")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "${app.cors.allowed-origins:http://localhost:3000}")
 public class AvailabilityController {
 
     private final AvailabilityService service;

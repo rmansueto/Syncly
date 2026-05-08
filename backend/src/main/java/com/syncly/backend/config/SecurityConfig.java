@@ -4,6 +4,8 @@ import com.syncly.backend.auth.JwtAuthenticationEntryPoint;
 import com.syncly.backend.auth.JwtAuthenticationFilter;
 import com.syncly.backend.auth.JwtUtil;
 import com.syncly.backend.user.UserService;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,6 +29,8 @@ public class SecurityConfig {
     private final JwtUtil jwtUtil;
     private final UserService userService;
     private final JwtAuthenticationEntryPoint entryPoint;
+    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    private String allowedOrigins;
 
     public SecurityConfig(JwtUtil jwtUtil, @Lazy UserService userService, JwtAuthenticationEntryPoint entryPoint) {
         this.jwtUtil = jwtUtil;
@@ -59,7 +63,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOrigins(List.of("http://localhost:3000")); // frontend dev origin
+        cfg.setAllowedOrigins(List.of(allowedOrigins.split(",")));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
